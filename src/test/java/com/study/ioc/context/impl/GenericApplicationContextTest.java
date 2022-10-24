@@ -28,7 +28,7 @@ public class GenericApplicationContextTest {
     }
 
     @Test
-    public void testCreateBeans() {
+    public void testCreateBeans() throws InstantiationException, IllegalAccessException {
         Map<String, BeanDefinition> beanDefinitionMap = new HashMap<>();
         BeanDefinition beanDefinitionMailService = new BeanDefinition("mailServicePOP", "com.study.entity.MailService");
         beanDefinitionMap.put("mailServicePOP", beanDefinitionMailService);
@@ -50,7 +50,7 @@ public class GenericApplicationContextTest {
 
 
     @Test(expected = BeanInstantiationException.class)
-    public void testCreateBeansWithWrongClass() {
+    public void testCreateBeansWithWrongClass() throws InstantiationException, IllegalAccessException {
         Map<String, BeanDefinition> beanDefinitionMap = new HashMap<>();
         BeanDefinition errorBeanDefinition = new BeanDefinition("mailServicePOP", "com.study.entity.TestClass");
         beanDefinitionMap.put("mailServicePOP", errorBeanDefinition);
