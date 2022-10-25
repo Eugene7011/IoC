@@ -1,4 +1,4 @@
-package com.study.ioc.entity;
+package com.study.entity;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -7,7 +7,6 @@ import lombok.Setter;
 @Getter
 @Setter
 @AllArgsConstructor
-public class Bean {
-    private String id;
-    private Object value;
+public class TestBeanFirst {
+    private String name;
 }

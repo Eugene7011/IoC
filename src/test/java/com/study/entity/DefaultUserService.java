@@ -1,8 +1,14 @@
 package com.study.entity;
 
+import lombok.Getter;
+import lombok.Setter;
+
+import javax.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
 
+@Setter
+@Getter
 public class DefaultUserService implements UserService {
 
     private IMailService mailService;
@@ -16,11 +22,4 @@ public class DefaultUserService implements UserService {
         }
     }
 
-    public void setMailService(IMailService mailService) {
-        this.mailService = mailService;
-    }
-
-    public IMailService getMailService() {
-        return mailService;
-    }
 }

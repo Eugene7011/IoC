@@ -20,4 +20,16 @@
     <bean id="userServiceImap" class="com.study.entity.DefaultUserService">
         <property name="mailService" ref="mailServiceIMAP"/>
     </bean>
+
+    <bean id="testBeanFirst" class="com.study.entity.TestBeanFirst">
+        <property name="name" value="testName"/>
+    </bean>
+
+    <bean id="testBeanSecond" class="com.study.entity.TestBeanFirst">
+        <property name="name" value="testName"/>
+    </bean>
+
+    <bean class="package com.study.ioc.processor.CustomBeanPostProcessor"/>
+    <bean class="package com.study.ioc.processor.CustomBeanFactoryPostProcessor"/>
+
 </beans>

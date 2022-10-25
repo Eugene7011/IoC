@@ -8,8 +8,8 @@ public class MailService implements IMailService {
 
     @PostConstruct
     private void init() {
-        this.port = port;
-        this.protocol = protocol;
+        this.port = port * 2;
+        this.protocol = "TEST" + protocol;
         // make some initialization
         // fill cache
     }
