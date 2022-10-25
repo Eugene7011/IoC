@@ -9,11 +9,9 @@ import com.study.ioc.exception.NoUniqueBeanOfTypeException;
 import com.study.ioc.reader.BeanDefinitionReader;
 import com.study.ioc.reader.sax.XmlBeanDefinitionReader;
 
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -43,26 +41,28 @@ public class GenericApplicationContext implements ApplicationContext {
 
     @Override
     public <T> T getBean(Class<T> clazz) {
-        validateIfBeansUnique();
+        T beanValue = null;
         for (Map.Entry<String, Bean> entry : beans.entrySet()) {
-            Object value = entry.getValue().getValue();
-
-            if (clazz.equals(value.getClass())) {
-                return (T) value;
+            Bean bean = entry.getValue();
+            if (clazz.isAssignableFrom(bean.getValue().getClass())) {
+                if (beanValue != null) {
+                    throw new NoUniqueBeanOfTypeException("No unique bean of type :" + clazz.getName());
+                }
+                beanValue = clazz.cast(bean.getValue());
             }
         }
-        return null;
+        return beanValue;
     }
 
     @Override
     public <T> T getBean(String id, Class<T> clazz) {
         for (Map.Entry<String, Bean> entry : beans.entrySet()) {
             if (id.equals(entry.getKey())) {
-                Class<?> aClass = entry.getValue().getValue().getClass();
-                if (!clazz.equals(aClass)) {
-                    throw new NoSuchBeanDefinitionException(id, clazz.getName(), aClass.getName());
+                Object value = entry.getValue().getValue();
+                if (!clazz.isAssignableFrom(value.getClass())) {
+                    throw new NoSuchBeanDefinitionException(id, clazz.getName(), value.getClass().getName());
                 }
-                return (T) entry.getValue().getValue();
+                return clazz.cast(value);
             }
         }
         return null;
@@ -74,7 +74,6 @@ public class GenericApplicationContext implements ApplicationContext {
     }
 
     Map<String, Bean> createBeans(Map<String, BeanDefinition> beanDefinitionMap) throws InstantiationException, IllegalAccessException {
-
         try {
             for (Map.Entry<String, BeanDefinition> entry : beanDefinitionMap.entrySet()) {
                 Object object = Class.forName(entry.getValue().getClassName()).newInstance();
@@ -82,7 +81,7 @@ public class GenericApplicationContext implements ApplicationContext {
                 beans.put(entry.getKey(), newBean);
             }
         } catch (ClassNotFoundException e) {
-            throw new BeanInstantiationException("BeanInstantiation failed", new Throwable());
+            throw new BeanInstantiationException("BeanInstantiation failed", e);
         }
         return beans;
     }
@@ -92,15 +91,7 @@ public class GenericApplicationContext implements ApplicationContext {
             String key = entry.getKey();
             Bean bean = beans.get(key);
             Map<String, String> valueDependencies = entry.getValue().getValueDependencies();
-            valueDependencies.forEach((k, v) ->
-            {
-                try {
-                    clarifyMethodAndInjectValue(bean, k, v);
-                } catch (ReflectiveOperationException e) {
-                    throw new RuntimeException(e);
-                }
-            });
-
+            valueDependencies.forEach((keyValue, value) -> clarifyMethodAndInjectValue(bean, keyValue, value));
         }
     }
 
@@ -110,28 +101,11 @@ public class GenericApplicationContext implements ApplicationContext {
             Bean bean = beans.get(key);
             Map<String, String> refDependencies = entry.getValue().getRefDependencies();
 
-            refDependencies.forEach((k, v) ->
-            {
-                try {
-                    Object value = beans.get(v).getValue();
-                    clarifyMethodAndInjectRefDependencies(bean, k, value);
-                } catch (ReflectiveOperationException e) {
-                    throw new RuntimeException(e);
-                }
-            });
+            refDependencies.forEach((fieldName, beanObject) -> clarifyMethodAndInjectRefDependencies(bean, fieldName, beans.get(beanObject).getValue()));
         }
     }
 
-    private void clarifyMethodAndInjectRefDependencies(Bean bean, String k, Object value) throws InvocationTargetException, IllegalAccessException {
-        Method[] declaredMethods = bean.getValue().getClass().getDeclaredMethods();
-        String methodName = "set" + k.substring(0, 1).toUpperCase() + k.substring(1);
-        Method methodClass = Arrays.stream(declaredMethods)
-                .filter(method -> method.getName().equals(methodName))
-                .findFirst().get();
-        methodClass.invoke(bean.getValue(), value);
-    }
-
-    void injectValue(Object object, Method classMethod, String propertyValue) throws ReflectiveOperationException {
+    void injectValue(Object object, Method classMethod, String propertyValue) {
         List<Method> methods = Arrays.stream(object.getClass().getDeclaredMethods()).toList();
         Class<?>[] parameterTypes = classMethod.getParameterTypes();
         if (parameterTypes.length != 1 || !methods.contains(classMethod)) {
@@ -141,39 +115,60 @@ public class GenericApplicationContext implements ApplicationContext {
 
         if (methodClassName.equalsIgnoreCase("int")) {
             int intValueOfProperty = Integer.parseInt(propertyValue);
-            classMethod.invoke(object, intValueOfProperty);
+            try {
+                classMethod.invoke(object, intValueOfProperty);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
             return;
         }
-        classMethod.invoke(object, propertyValue);
+        try {
+            classMethod.invoke(object, propertyValue);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     void setBeans(Map<String, Bean> beans) {
         this.beans = beans;
     }
 
-    private void validateIfBeansUnique() {
-        List<? extends Class<?>> classes = beans.values().stream().map(bean -> bean.getValue().getClass()).toList();
-        HashSet<Object> beanHashSet = new HashSet<>(classes);
-        if (classes.size() != beanHashSet.size()) {
-            throw new NoUniqueBeanOfTypeException("There are duplicates in beans values");
-        }
-    }
-
-    private void clarifyMethodAndInjectValue(Bean bean, String k, String v) throws ReflectiveOperationException {
+    private void clarifyMethodAndInjectValue(Bean bean, String keyValue, String value) {
         Method[] declaredMethods = bean.getValue().getClass().getDeclaredMethods();
-        String methodName = "set" + k.substring(0, 1).toUpperCase() + k.substring(1);
+        String methodName = "set" + keyValue.substring(0, 1).toUpperCase() + keyValue.substring(1);
         Method methodClass = Arrays.stream(declaredMethods)
                 .filter(method -> method.getName().equals(methodName))
                 .findFirst().get();
         Class<?>[] parameterTypes = methodClass.getParameterTypes();
         String methodClassName = parameterTypes[0].getName();
         if (methodClassName.equals("int")) {
-            Method neededMethod = bean.getValue().getClass().getDeclaredMethod(methodName, Integer.TYPE);
-            injectValue(bean.getValue(), neededMethod, v);
+            try {
+                Method neededMethod = bean.getValue().getClass().getDeclaredMethod(methodName, Integer.TYPE);
+                injectValue(bean.getValue(), neededMethod, value);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
             return;
         }
-        Method neededMethod = bean.getValue().getClass().getDeclaredMethod(methodName, String.class);
-        injectValue(bean.getValue(), neededMethod, String.valueOf(v));
+
+        try {
+            Method neededMethod = bean.getValue().getClass().getDeclaredMethod(methodName, String.class);
+            injectValue(bean.getValue(), neededMethod, String.valueOf(value));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
+    private void clarifyMethodAndInjectRefDependencies(Bean bean, String fieldName, Object value) {
+        Method[] declaredMethods = bean.getValue().getClass().getDeclaredMethods();
+        String methodName = "set" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
+        Method methodClass = Arrays.stream(declaredMethods)
+                .filter(method -> method.getName().equals(methodName))
+                .findFirst().get();
+        try {
+            methodClass.invoke(bean.getValue(), value);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 }
