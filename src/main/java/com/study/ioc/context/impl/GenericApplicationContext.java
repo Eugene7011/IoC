@@ -6,6 +6,7 @@ import com.study.ioc.entity.BeanDefinition;
 import com.study.ioc.exception.BeanInstantiationException;
 import com.study.ioc.exception.NoSuchBeanDefinitionException;
 import com.study.ioc.exception.NoUniqueBeanOfTypeException;
+import com.study.ioc.exception.ProcessPostConstructException;
 import com.study.ioc.processor.BeanFactoryPostProcessor;
 import com.study.ioc.processor.BeanPostProcessor;
 import com.study.ioc.reader.BeanDefinitionReader;
@@ -90,22 +91,26 @@ public class GenericApplicationContext implements ApplicationContext {
         return beans.keySet().stream().toList();
     }
 
-    Map<String, Bean> createBeans(Map<String, BeanDefinition> beanDefinitionMap) throws InstantiationException, IllegalAccessException {
+    public Map<String, Bean> createBeans(Map<String, BeanDefinition> beanDefinitionMap) throws InstantiationException, IllegalAccessException {
         try {
             for (Map.Entry<String, BeanDefinition> entry : beanDefinitionMap.entrySet()) {
                 Object object = Class.forName(entry.getValue().getClassName()).getDeclaredConstructor().newInstance();
-                Bean newBean = new Bean(entry.getValue().getId(), object);
-                beans.put(entry.getKey(), newBean);
+
+                if (!(BeanFactoryPostProcessor.class).isAssignableFrom(object.getClass()) &&
+                        !(BeanPostProcessor.class).isAssignableFrom(object.getClass())) {
+                    Bean newBean = new Bean(entry.getValue().getId(), object);
+                    beans.put(entry.getKey(), newBean);
+                }
             }
         } catch (ClassNotFoundException e) {
             throw new BeanInstantiationException("BeanInstantiation failed", e);
-        } catch (NoSuchMethodException | InvocationTargetException e){
+        } catch (NoSuchMethodException | InvocationTargetException e) {
             e.printStackTrace();
         }
         return beans;
     }
 
-    void injectValueDependencies(Map<String, BeanDefinition> beanDefinitions, Map<String, Bean> beans) {
+    public void injectValueDependencies(Map<String, BeanDefinition> beanDefinitions, Map<String, Bean> beans) {
         for (Map.Entry<String, BeanDefinition> entry : beanDefinitions.entrySet()) {
             String key = entry.getKey();
             Bean bean = beans.get(key);
@@ -114,25 +119,26 @@ public class GenericApplicationContext implements ApplicationContext {
         }
     }
 
-    void injectRefDependencies(Map<String, BeanDefinition> beanDefinitions, Map<String, Bean> beans) {
+    public void injectRefDependencies(Map<String, BeanDefinition> beanDefinitions, Map<String, Bean> beans) {
         for (Map.Entry<String, BeanDefinition> entry : beanDefinitions.entrySet()) {
             String key = entry.getKey();
             Bean bean = beans.get(key);
             Map<String, String> refDependencies = entry.getValue().getRefDependencies();
 
-            refDependencies.forEach((fieldName, beanObject) -> clarifyMethodAndInjectRefDependencies(bean, fieldName, beans.get(beanObject).getValue()));
+            refDependencies.forEach((fieldName, beanObject)
+                    -> clarifyMethodAndInjectRefDependencies(bean, fieldName, beans.get(beanObject).getValue()));
         }
     }
 
     @SneakyThrows
-    void injectValue(Object object, Method classMethod, String propertyValue) {
+    public void injectValue(Object object, Method classMethod, String propertyValue) {
         List<Method> methods = Arrays.stream(object.getClass().getDeclaredMethods()).toList();
         Class<?>[] parameterTypes = classMethod.getParameterTypes();
         if (parameterTypes.length != 1 || !methods.contains(classMethod)) {
             throw new IllegalArgumentException();
         }
-        String methodClassName = parameterTypes[0].getName();
 
+        String methodClassName = parameterTypes[0].getName();
         if (methodClassName.equalsIgnoreCase("int")) {
             int intValueOfProperty = Integer.parseInt(propertyValue);
             classMethod.invoke(object, intValueOfProperty);
@@ -141,58 +147,7 @@ public class GenericApplicationContext implements ApplicationContext {
         classMethod.invoke(object, propertyValue);
     }
 
-    void setBeans(Map<String, Bean> beans) {
-        this.beans = beans;
-    }
-
-    @SneakyThrows
-    private void clarifyMethodAndInjectValue(Bean bean, String keyValue, String value) {
-        Method[] declaredMethods = bean.getValue().getClass().getDeclaredMethods();
-        String methodName = "set" + keyValue.substring(0, 1).toUpperCase() + keyValue.substring(1);
-        Method methodClass = Arrays.stream(declaredMethods)
-                .filter(method -> method.getName().equals(methodName))
-                .findFirst().get();
-        Class<?>[] parameterTypes = methodClass.getParameterTypes();
-        String methodClassName = parameterTypes[0].getName();
-        if (methodClassName.equals("int")) {
-            Method neededMethod = bean.getValue().getClass().getDeclaredMethod(methodName, Integer.TYPE);
-            injectValue(bean.getValue(), neededMethod, value);
-            return;
-        }
-        Method neededMethod = bean.getValue().getClass().getDeclaredMethod(methodName, String.class);
-        injectValue(bean.getValue(), neededMethod, String.valueOf(value));
-    }
-
-    @SneakyThrows
-    private void clarifyMethodAndInjectRefDependencies(Bean bean, String fieldName, Object value) {
-        Method[] declaredMethods = bean.getValue().getClass().getDeclaredMethods();
-        String methodName = "set" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
-        Method methodClass = Arrays.stream(declaredMethods)
-                .filter(method -> method.getName().equals(methodName))
-                .findFirst().get();
-        methodClass.invoke(bean.getValue(), value);
-    }
-
-    @SneakyThrows
-    void createAllServiceBeans(Map<String, BeanDefinition> beanDefinitions) {
-        for (Map.Entry<String, BeanDefinition> entry : beanDefinitions.entrySet()) {
-            BeanDefinition entryValue = entry.getValue();
-            Class<?> clazz = Class.forName(entryValue.getClassName());
-
-            if ((BeanFactoryPostProcessor.class).isAssignableFrom(clazz)){
-                BeanFactoryPostProcessor newFactoryPostProcessor = (BeanFactoryPostProcessor) Class.forName(clazz.getName()).getDeclaredConstructor().newInstance();
-                serviceFactoryBeans.add(newFactoryPostProcessor);
-            }
-
-            if ((BeanPostProcessor.class).isAssignableFrom(clazz) ){
-                BeanPostProcessor newPostProcessor = (BeanPostProcessor) Class.forName(clazz.getName()).getDeclaredConstructor().newInstance();
-                Bean newBean = new Bean(entryValue.getId(), newPostProcessor);
-                serviceBeans.put(entry.getKey(), newBean);
-            }
-        }
-    }
-
-    void processBeanDefinitions(Map<String, BeanDefinition> beanDefinitions) {
+    public void processBeanDefinitions(Map<String, BeanDefinition> beanDefinitions) {
         List<BeanDefinition> beanDefinitionList = new ArrayList<>();
         for (Map.Entry<String, BeanDefinition> entry : beanDefinitions.entrySet()) {
             beanDefinitionList.add(entry.getValue());
@@ -203,32 +158,110 @@ public class GenericApplicationContext implements ApplicationContext {
         }
     }
 
-    private void postProcessBeans() {
-        for (Map.Entry<String, Bean> entry : serviceBeans.entrySet()) {
-            Bean bean = entry.getValue();
-            BeanPostProcessor beanPostProcessor = (BeanPostProcessor) bean.getValue();
+    @SneakyThrows
+    public void createAllServiceBeans(Map<String, BeanDefinition> beanDefinitions) {
+        for (Map.Entry<String, BeanDefinition> entry : beanDefinitions.entrySet()) {
+            BeanDefinition entryValue = entry.getValue();
+            Class<?> clazz = Class.forName(entryValue.getClassName());
 
-            beanPostProcessor.postProcessBeforeInitialization(bean, entry.getKey());
-            callInitMethods();
-            beanPostProcessor.postProcessAfterInitialization(bean, entry.getKey());
+            createFactoryPostProcessBeans(clazz);
+            createPostProcessBeans(clazz, entry);
         }
     }
 
-    @SneakyThrows
-    private void callInitMethods() {
+    public void callPostProcessAfterInitialization(Bean bean, BeanPostProcessor beanPostProcessor) {
+        beanPostProcessor.postProcessAfterInitialization(bean, bean.getId());
+    }
 
-        for (Map.Entry<String, Bean> entry : serviceBeans.entrySet()) {
+    public void callPostProcessBeforeInitialization(Bean bean, BeanPostProcessor beanPostProcessor) {
+        beanPostProcessor.postProcessBeforeInitialization(bean, bean.getId());
+    }
+
+    @SneakyThrows
+    public void callInitMethods() {
+
+        for (Map.Entry<String, Bean> entry : beans.entrySet()) {
             Bean bean = entry.getValue();
             Class<?> clazz = bean.getValue().getClass();
 
-            Method[] methods = clazz.getMethods();
-            for (Method method : methods) {
-                if (method.getAnnotation(PostConstruct.class) != null) {
+            Method[] allMethods = clazz.getDeclaredMethods();
+            List<Method> annotatedMethods = Arrays.stream(allMethods)
+                    .filter(method -> method.getAnnotation(PostConstruct.class) != null)
+                    .toList();
+
+            for (Method method : annotatedMethods) {
+                try {
+                    method.setAccessible(true);
                     method.invoke(bean.getValue());
+                } catch (IllegalAccessException e) {
+                    throw new ProcessPostConstructException("Access to private fields denied", e);
                 }
             }
         }
     }
 
+    @SneakyThrows
+    private void createPostProcessBeans(Class<?> clazz, Map.Entry<String, BeanDefinition> entry) {
+        if ((BeanPostProcessor.class).isAssignableFrom(clazz)) {
+            BeanDefinition entryValue = entry.getValue();
+            BeanPostProcessor newPostProcessor =
+                    (BeanPostProcessor) Class.forName(clazz.getName()).getDeclaredConstructor().newInstance();
+            Bean newBean = new Bean(entryValue.getId(), newPostProcessor);
+            serviceBeans.put(entry.getKey(), newBean);
+        }
+    }
+
+    @SneakyThrows
+    private void clarifyMethodAndInjectValue(Bean bean, String keyValue, String value) {
+        Method[] declaredMethods = bean.getValue().getClass().getDeclaredMethods();
+        String methodName = "set" + keyValue.substring(0, 1).toUpperCase() + keyValue.substring(1);
+        Method methodClass = Arrays.stream(declaredMethods)
+                .filter(method -> method.getName().equals(methodName))
+                .findFirst().orElseThrow(Exception::new);
+        Class<?>[] parameterTypes = methodClass.getParameterTypes();
+        String methodClassName = parameterTypes[0].getName();
+
+        if (methodClassName.equals("int")) {
+            Method neededMethod = bean.getValue().getClass().getDeclaredMethod(methodName, Integer.TYPE);
+            injectValue(bean.getValue(), neededMethod, value);
+            return;
+        }
+        Method neededMethod = bean.getValue().getClass().getDeclaredMethod(methodName, String.class);
+        injectValue(bean.getValue(), neededMethod, String.valueOf(value));
+    }
+
+    @SneakyThrows
+    private void createFactoryPostProcessBeans(Class<?> clazz) {
+        if ((BeanFactoryPostProcessor.class).isAssignableFrom(clazz)) {
+            BeanFactoryPostProcessor newFactoryPostProcessor =
+                    (BeanFactoryPostProcessor) Class.forName(clazz.getName()).getDeclaredConstructor().newInstance();
+            serviceFactoryBeans.add(newFactoryPostProcessor);
+        }
+    }
+
+    @SneakyThrows
+    private void clarifyMethodAndInjectRefDependencies(Bean bean, String fieldName, Object value) {
+        Method[] declaredMethods = bean.getValue().getClass().getDeclaredMethods();
+        String methodName = "set" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
+        Method methodClass = Arrays.stream(declaredMethods)
+                .filter(method -> method.getName().equals(methodName))
+                .findFirst().orElseThrow(Exception::new);
+        methodClass.invoke(bean.getValue(), value);
+    }
+
+    private void postProcessBeans() {
+        for (Map.Entry<String, Bean> serviceEntry : serviceBeans.entrySet()) {
+            Bean serviceBean = serviceEntry.getValue();
+            BeanPostProcessor beanPostProcessor = (BeanPostProcessor) serviceBean.getValue();
+
+            for (Map.Entry<String, Bean> beanEntry : beans.entrySet()) {
+                Bean bean = beanEntry.getValue();
+
+                callPostProcessBeforeInitialization(bean, beanPostProcessor);
+                callInitMethods();
+                callPostProcessAfterInitialization(bean, beanPostProcessor);
+            }
+        }
+    }
 
 }

@@ -6,13 +6,14 @@ public class MailService implements IMailService {
     private String protocol;
     private int port;
 
-//    @PostConstruct
-//    private void init() {
-//        this.port = port * 2;
-//        this.protocol = "TEST" + protocol;
-//        // make some initialization
-//        // fill cache
-//    }
+    @PostConstruct
+    private void init() {
+        this.port = port + 1000;
+        this.protocol = "TEST";
+
+        // make some initialization
+        // fill cache
+    }
 
     @Override
     public void sendEmail(User user, String message) {

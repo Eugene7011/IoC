@@ -9,6 +9,7 @@ import com.study.ioc.exception.BeanInstantiationException;
 import com.study.ioc.exception.NoSuchBeanDefinitionException;
 import com.study.ioc.exception.NoUniqueBeanOfTypeException;
 import com.study.ioc.processor.BeanFactoryPostProcessor;
+import com.study.ioc.processor.BeanPostProcessor;
 import com.study.ioc.processor.CustomBeanFactoryPostProcessor;
 import com.study.ioc.processor.CustomBeanPostProcessor;
 import org.junit.Before;
@@ -20,7 +21,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 public class GenericApplicationContextTest {
 
@@ -225,8 +229,6 @@ public class GenericApplicationContextTest {
         genericApplicationContext.processBeanDefinitions(beanDefinitionMap);
         Map<String, Bean> beanMap = genericApplicationContext.createBeans(beanDefinitionMap);
         genericApplicationContext.injectValueDependencies(beanDefinitionMap, beanMap);
-//        genericApplicationContext.injectRefDependencies(beanDefinitionMap, beanMap);
-
 
         Bean actualMailBean = beanMap.get("mailServicePOP");
         assertNotNull(actualMailBean);
@@ -239,7 +241,7 @@ public class GenericApplicationContextTest {
     }
 
     @Test
-    public void createAllServiceBeans() throws InstantiationException, IllegalAccessException {
+    public void createAllServiceBeans() {
         Map<String, BeanDefinition> beanDefinitionMap = new HashMap<>();
         BeanDefinition beanDefinitionUserService = new BeanDefinition("userService", "com.study.entity.DefaultUserService");
         beanDefinitionMap.put("userService", beanDefinitionUserService);
@@ -261,6 +263,55 @@ public class GenericApplicationContextTest {
         assertEquals(CustomBeanFactoryPostProcessor.class, serviceFactoryBeans.get(0).getClass());
         Class<?> customBeanPostProcessor = serviceBeans.get("customBeanPostProcessor").getValue().getClass();
         assertEquals(CustomBeanPostProcessor.class, customBeanPostProcessor);
-
     }
+
+    @Test
+    public void createBeansNotSaveServiceBeans() throws InstantiationException, IllegalAccessException {
+        Map<String, BeanDefinition> beanDefinitionMap = new HashMap<>();
+        BeanDefinition beanDefinitionUserService = new BeanDefinition("userService", "com.study.entity.DefaultUserService");
+        beanDefinitionMap.put("userService", beanDefinitionUserService);
+        BeanDefinition beanDefinitionFactoryPostProcessor =
+                new BeanDefinition("customBeanFactoryPostProcessor", "com.study.ioc.processor.CustomBeanFactoryPostProcessor");
+        beanDefinitionMap.put("customBeanFactoryPostProcessor", beanDefinitionFactoryPostProcessor);
+
+        Map<String, Bean> beans = genericApplicationContext.createBeans(beanDefinitionMap);
+
+        assertNotNull(beans);
+        assertEquals(1, beans.size());
+        assertNull(beans.get("customBeanFactoryPostProcessor"));
+    }
+
+    @Test
+    public void processBeans() throws InstantiationException, IllegalAccessException {
+        Map<String, BeanDefinition> beanDefinitionMap = new HashMap<>();
+        BeanDefinition beanDefinitionUserService = new BeanDefinition("userService", "com.study.entity.DefaultUserService");
+        beanDefinitionMap.put("userService", beanDefinitionUserService);
+        BeanDefinition beanDefinitionMailService = new BeanDefinition("mailServicePOP", "com.study.entity.MailService");
+        beanDefinitionMap.put("mailServicePOP", beanDefinitionMailService);
+        BeanDefinition beanDefinitionPostProcessor =
+                new BeanDefinition("customBeanPostProcessor", "com.study.ioc.processor.CustomBeanPostProcessor");
+        beanDefinitionMap.put("customBeanPostProcessor", beanDefinitionPostProcessor);
+
+        Map<String, Bean> beans = genericApplicationContext.createBeans(beanDefinitionMap);
+        genericApplicationContext.createAllServiceBeans(beanDefinitionMap);
+        Bean customBeanPostProcessor = genericApplicationContext.getServiceBeans().get("customBeanPostProcessor");
+        BeanPostProcessor beanPostProcessor = (BeanPostProcessor) customBeanPostProcessor.getValue();
+        Bean userServiceBean = beans.get("userService");
+
+        genericApplicationContext.callPostProcessBeforeInitialization(userServiceBean, beanPostProcessor);
+        assertEquals("BeforeInitialization", userServiceBean.getId());
+
+        Bean mailServiceBean = beans.get("mailServicePOP");
+        MailService mailService = (MailService) mailServiceBean.getValue();
+        assertEquals(0, mailService.getPort());
+        assertEquals(null, mailService.getProtocol());
+
+        genericApplicationContext.callInitMethods();
+        assertEquals(1000, mailService.getPort());
+        assertEquals("TEST", mailService.getProtocol());
+
+        genericApplicationContext.callPostProcessAfterInitialization(userServiceBean, beanPostProcessor);
+        assertEquals("AfterInitialization", userServiceBean.getId());
+    }
+
 }
