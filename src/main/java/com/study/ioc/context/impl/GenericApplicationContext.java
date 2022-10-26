@@ -10,6 +10,9 @@ import com.study.ioc.processor.BeanFactoryPostProcessor;
 import com.study.ioc.processor.BeanPostProcessor;
 import com.study.ioc.reader.BeanDefinitionReader;
 import com.study.ioc.reader.sax.XmlBeanDefinitionReader;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.SneakyThrows;
 
 import javax.annotation.PostConstruct;
@@ -21,6 +24,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@AllArgsConstructor
+@Setter
+@Getter
 public class GenericApplicationContext implements ApplicationContext {
 
     private Map<String, Bean> beans = new HashMap<>();
@@ -37,7 +43,7 @@ public class GenericApplicationContext implements ApplicationContext {
     public GenericApplicationContext(BeanDefinitionReader definitionReader) throws InstantiationException, IllegalAccessException {
         Map<String, BeanDefinition> beanDefinitions = definitionReader.getBeanDefinition();
 
-        createServiceBeans(beanDefinitions);
+        createAllServiceBeans(beanDefinitions);
         processBeanDefinitions(beanDefinitions);
         beans = createBeans(beanDefinitions);
         injectValueDependencies(beanDefinitions, beans);
@@ -168,17 +174,17 @@ public class GenericApplicationContext implements ApplicationContext {
     }
 
     @SneakyThrows
-    private void createServiceBeans(Map<String, BeanDefinition> beanDefinitions) {
+    void createAllServiceBeans(Map<String, BeanDefinition> beanDefinitions) {
         for (Map.Entry<String, BeanDefinition> entry : beanDefinitions.entrySet()) {
             BeanDefinition entryValue = entry.getValue();
             Class<?> clazz = Class.forName(entryValue.getClassName());
 
-            if (clazz.isAssignableFrom(BeanFactoryPostProcessor.class) ){
+            if ((BeanFactoryPostProcessor.class).isAssignableFrom(clazz)){
                 BeanFactoryPostProcessor newFactoryPostProcessor = (BeanFactoryPostProcessor) Class.forName(clazz.getName()).getDeclaredConstructor().newInstance();
                 serviceFactoryBeans.add(newFactoryPostProcessor);
             }
 
-            if (clazz.isAssignableFrom(BeanPostProcessor.class) ){
+            if ((BeanPostProcessor.class).isAssignableFrom(clazz) ){
                 BeanPostProcessor newPostProcessor = (BeanPostProcessor) Class.forName(clazz.getName()).getDeclaredConstructor().newInstance();
                 Bean newBean = new Bean(entryValue.getId(), newPostProcessor);
                 serviceBeans.put(entry.getKey(), newBean);
@@ -186,14 +192,15 @@ public class GenericApplicationContext implements ApplicationContext {
         }
     }
 
-    private void processBeanDefinitions(Map<String, BeanDefinition> beanDefinitions) {
+    void processBeanDefinitions(Map<String, BeanDefinition> beanDefinitions) {
         List<BeanDefinition> beanDefinitionList = new ArrayList<>();
         for (Map.Entry<String, BeanDefinition> entry : beanDefinitions.entrySet()) {
             beanDefinitionList.add(entry.getValue());
         }
 
-        serviceFactoryBeans.stream()
-                .forEach(factoryBean -> factoryBean.postProcessorBeanFactory(beanDefinitionList));
+        for (BeanFactoryPostProcessor serviceFactoryBean : serviceFactoryBeans) {
+            serviceFactoryBean.postProcessorBeanFactory(beanDefinitionList, beanDefinitions);
+        }
     }
 
     private void postProcessBeans() {
@@ -212,7 +219,7 @@ public class GenericApplicationContext implements ApplicationContext {
 
         for (Map.Entry<String, Bean> entry : serviceBeans.entrySet()) {
             Bean bean = entry.getValue();
-            Class<? extends Object> clazz = bean.getValue().getClass();
+            Class<?> clazz = bean.getValue().getClass();
 
             Method[] methods = clazz.getMethods();
             for (Method method : methods) {
@@ -221,7 +228,6 @@ public class GenericApplicationContext implements ApplicationContext {
                 }
             }
         }
-
     }
 
 

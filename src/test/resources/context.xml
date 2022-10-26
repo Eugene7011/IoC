@@ -29,7 +29,7 @@
         <property name="name" value="testName"/>
     </bean>
 
-    <bean class="package com.study.ioc.processor.CustomBeanPostProcessor"/>
-    <bean class="package com.study.ioc.processor.CustomBeanFactoryPostProcessor"/>
+    <bean id="beanPostProcessor" class="com.study.ioc.processor.CustomBeanPostProcessor"/>
+    <bean id="factoryBeanPostProcessor" class="com.study.ioc.processor.CustomBeanFactoryPostProcessor"/>
 
 </beans>
