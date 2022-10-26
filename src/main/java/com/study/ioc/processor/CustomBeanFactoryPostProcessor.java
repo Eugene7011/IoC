@@ -9,7 +9,7 @@ import java.util.Map;
 public class CustomBeanFactoryPostProcessor implements BeanFactoryPostProcessor{
 
     @Override
-    public void postProcessorBeanFactory(List<BeanDefinition> beanDefinitionList, Map<String, BeanDefinition> beanDefinitions) {
+    public void postProcessorBeanFactory(Map<String, BeanDefinition> beanDefinitions) {
         for (Map.Entry<String, BeanDefinition> entry : beanDefinitions.entrySet()) {
             BeanDefinition beanDefinition = entry.getValue();
             if (beanDefinition.getId().equals(("mailServicePOP"))){
@@ -20,14 +20,5 @@ public class CustomBeanFactoryPostProcessor implements BeanFactoryPostProcessor{
                 beanDefinition.setValueDependencies(myMap);
             }
         }
-//        for (BeanDefinition beanDefinition : beanDefinitionList) {
-//            if (beanDefinition.getId().equals(("mailServicePOP"))){
-//                Map<String, String> myMap = new HashMap<>() {{
-//                    put("port", "1000");
-//                    put("protocol", "TEST");
-//                }};
-//                beanDefinition.setValueDependencies(myMap);
-//            }
-//        }
     }
 }

@@ -46,7 +46,7 @@ public class GenericApplicationContext implements ApplicationContext {
 
         createAllServiceBeans(beanDefinitions);
         processBeanDefinitions(beanDefinitions);
-        beans = createBeans(beanDefinitions);
+        createBeans(beanDefinitions);
         injectValueDependencies(beanDefinitions, beans);
         injectRefDependencies(beanDefinitions, beans);
         postProcessBeans();
@@ -154,7 +154,7 @@ public class GenericApplicationContext implements ApplicationContext {
         }
 
         for (BeanFactoryPostProcessor serviceFactoryBean : serviceFactoryBeans) {
-            serviceFactoryBean.postProcessorBeanFactory(beanDefinitionList, beanDefinitions);
+            serviceFactoryBean.postProcessorBeanFactory(beanDefinitions);
         }
     }
 
@@ -169,12 +169,12 @@ public class GenericApplicationContext implements ApplicationContext {
         }
     }
 
-    public void callPostProcessAfterInitialization(Bean bean, BeanPostProcessor beanPostProcessor) {
-        beanPostProcessor.postProcessAfterInitialization(bean, bean.getId());
+    public void callPostProcessAfterInitialization(Bean bean, BeanPostProcessor objectPostProcessor) {
+        objectPostProcessor.postProcessAfterInitialization(bean, bean.getId());
     }
 
-    public void callPostProcessBeforeInitialization(Bean bean, BeanPostProcessor beanPostProcessor) {
-        beanPostProcessor.postProcessBeforeInitialization(bean, bean.getId());
+    public void callPostProcessBeforeInitialization(Bean bean, BeanPostProcessor objectPostProcessor) {
+        objectPostProcessor.postProcessBeforeInitialization(bean, bean.getId());
     }
 
     @SneakyThrows
@@ -252,14 +252,14 @@ public class GenericApplicationContext implements ApplicationContext {
     private void postProcessBeans() {
         for (Map.Entry<String, Bean> serviceEntry : serviceBeans.entrySet()) {
             Bean serviceBean = serviceEntry.getValue();
-            BeanPostProcessor beanPostProcessor = (BeanPostProcessor) serviceBean.getValue();
+            BeanPostProcessor objectPostProcessor = (BeanPostProcessor) serviceBean.getValue();
 
             for (Map.Entry<String, Bean> beanEntry : beans.entrySet()) {
                 Bean bean = beanEntry.getValue();
 
-                callPostProcessBeforeInitialization(bean, beanPostProcessor);
+                callPostProcessBeforeInitialization(bean, objectPostProcessor);
                 callInitMethods();
-                callPostProcessAfterInitialization(bean, beanPostProcessor);
+                callPostProcessAfterInitialization(bean, objectPostProcessor);
             }
         }
     }

@@ -7,5 +7,5 @@ import java.util.Map;
 
 public interface BeanFactoryPostProcessor {
 
-    void postProcessorBeanFactory(List<BeanDefinition> beanDefinitionList, Map<String, BeanDefinition> beanDefinitions);
+    void postProcessorBeanFactory(Map<String, BeanDefinition> beanDefinitions);
 }
