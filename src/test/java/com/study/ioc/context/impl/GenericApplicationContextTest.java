@@ -183,9 +183,10 @@ public class GenericApplicationContextTest {
     public void testInjectRefDependencies() {
         Map<String, Bean> beanMap = new HashMap<>();
         Map<String, BeanDefinition> beanDefinitionMap = new HashMap<>();
+        int port = 110;
 
         MailService mailServicePOP = new MailService();
-        mailServicePOP.setPort(110);
+        mailServicePOP.setPort(port);
         mailServicePOP.setProtocol("POP3");
         beanMap.put("mailServicePOP", new Bean("mailServicePOP", mailServicePOP));
 
