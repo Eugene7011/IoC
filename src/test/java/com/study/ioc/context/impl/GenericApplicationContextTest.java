@@ -183,9 +183,10 @@ public class GenericApplicationContextTest {
     public void testInjectRefDependencies() {
         Map<String, Bean> beanMap = new HashMap<>();
         Map<String, BeanDefinition> beanDefinitionMap = new HashMap<>();
+        int port = 110;
 
         MailService mailServicePOP = new MailService();
-        mailServicePOP.setPort(110);
+        mailServicePOP.setPort(port);
         mailServicePOP.setProtocol("POP3");
         beanMap.put("mailServicePOP", new Bean("mailServicePOP", mailServicePOP));
 
@@ -297,21 +298,26 @@ public class GenericApplicationContextTest {
         Bean customBeanPostProcessor = genericApplicationContext.getServiceBeans().get("customBeanPostProcessor");
         BeanPostProcessor beanPostProcessor = (BeanPostProcessor) customBeanPostProcessor.getValue();
         Bean userServiceBean = beans.get("userService");
+        assertEquals("userService", userServiceBean.getId());
 
         genericApplicationContext.callPostProcessBeforeInitialization(userServiceBean, beanPostProcessor);
-        assertEquals("BeforeInitialization", userServiceBean.getId());
+        Bean userServiceBeanAfterProcess = beans.get("userService");
+        assertEquals("BeforeInitialization", userServiceBeanAfterProcess.getId());
 
         Bean mailServiceBean = beans.get("mailServicePOP");
         MailService mailService = (MailService) mailServiceBean.getValue();
         assertEquals(0, mailService.getPort());
-        assertEquals(null, mailService.getProtocol());
+        assertNull(mailService.getProtocol());
 
         genericApplicationContext.callInitMethods();
-        assertEquals(1000, mailService.getPort());
-        assertEquals("TEST", mailService.getProtocol());
+        Bean mailServiceBeanAfterInitMethod = beans.get("mailServicePOP");
+        MailService mailServiceAfterInitMethod = (MailService) mailServiceBeanAfterInitMethod.getValue();
+        assertEquals(1000, mailServiceAfterInitMethod.getPort());
+        assertEquals("TEST", mailServiceAfterInitMethod.getProtocol());
 
         genericApplicationContext.callPostProcessAfterInitialization(userServiceBean, beanPostProcessor);
-        assertEquals("AfterInitialization", userServiceBean.getId());
+        Bean userServiceBeanAfterProcessor = beans.get("userService");
+        assertEquals("AfterInitialization", userServiceBeanAfterProcessor.getId());
     }
 
 }

@@ -170,11 +170,13 @@ public class GenericApplicationContext implements ApplicationContext {
     }
 
     public void callPostProcessAfterInitialization(Bean bean, BeanPostProcessor objectPostProcessor) {
-        objectPostProcessor.postProcessAfterInitialization(bean, bean.getId());
+        Bean beanAfterProcess = objectPostProcessor.postProcessAfterInitialization(bean, bean.getId());
+        beans.put(bean.getId(), beanAfterProcess);
     }
 
     public void callPostProcessBeforeInitialization(Bean bean, BeanPostProcessor objectPostProcessor) {
-        objectPostProcessor.postProcessBeforeInitialization(bean, bean.getId());
+        Bean beanBeforeProcess = objectPostProcessor.postProcessBeforeInitialization(bean, bean.getId());
+        beans.put(bean.getId(), beanBeforeProcess);
     }
 
     @SneakyThrows

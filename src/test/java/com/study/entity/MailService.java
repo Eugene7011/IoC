@@ -1,7 +1,12 @@
 package com.study.entity;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import javax.annotation.PostConstruct;
 
+@Getter
+@Setter
 public class MailService implements IMailService {
     private String protocol;
     private int port;
@@ -20,19 +25,4 @@ public class MailService implements IMailService {
         System.out.println("sending email with message: " + message);
     }
 
-    public void setProtocol(String protocol) {
-        this.protocol = protocol;
-    }
-
-    public void setPort(int port) {
-        this.port = port;
-    }
-
-    public String getProtocol() {
-        return protocol;
-    }
-
-    public int getPort() {
-        return port;
-    }
 }
