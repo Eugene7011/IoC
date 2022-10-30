@@ -24,4 +24,8 @@
     <bean id="beanPostProcessor" class="com.study.ioc.processor.CustomBeanPostProcessor"/>
     <bean id="factoryBeanPostProcessor" class="com.study.ioc.processor.CustomBeanFactoryPostProcessor"/>
 
+    <bean id="testClass" class="com.study.ioc.processor.TestClass">
+        <property name="text" value="test"/>
+        <property name="id" value="000"/>
+    </bean>
 </beans>

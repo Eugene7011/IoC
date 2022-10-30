@@ -113,9 +113,12 @@ public class GenericApplicationContext implements ApplicationContext {
     public void injectValueDependencies(Map<String, BeanDefinition> beanDefinitions, Map<String, Bean> beans) {
         for (Map.Entry<String, BeanDefinition> entry : beanDefinitions.entrySet()) {
             String key = entry.getKey();
-            Bean bean = beans.get(key);
+            Bean bean = getBeans().get(key);
             Map<String, String> valueDependencies = entry.getValue().getValueDependencies();
-            valueDependencies.forEach((keyValue, value) -> clarifyMethodAndInjectValue(bean, keyValue, value));
+
+            for (Map.Entry<String, String> entrySet : valueDependencies.entrySet()) {
+                clarifyMethodAndInjectValue(bean, entrySet.getKey(), entrySet.getValue());
+            }
         }
     }
 
@@ -125,14 +128,16 @@ public class GenericApplicationContext implements ApplicationContext {
             Bean bean = beans.get(key);
             Map<String, String> refDependencies = entry.getValue().getRefDependencies();
 
-            refDependencies.forEach((fieldName, beanObject)
-                    -> clarifyMethodAndInjectRefDependencies(bean, fieldName, beans.get(beanObject).getValue()));
+            if (refDependencies.size() != 0) {
+                refDependencies.forEach((fieldName, beanObject)
+                        -> clarifyMethodAndInjectRefDependencies(bean, fieldName, beans.get(beanObject).getValue()));
+            }
         }
     }
 
     @SneakyThrows
     public void injectValue(Object object, Method classMethod, String propertyValue) {
-        List<Method> methods = Arrays.stream(object.getClass().getDeclaredMethods()).toList();
+        List<Method> methods = Arrays.stream(object.getClass().getMethods()).toList();
         Class<?>[] parameterTypes = classMethod.getParameterTypes();
         if (parameterTypes.length != 1 || !methods.contains(classMethod)) {
             throw new IllegalArgumentException();
@@ -170,13 +175,15 @@ public class GenericApplicationContext implements ApplicationContext {
     }
 
     public void callPostProcessAfterInitialization(Bean bean, BeanPostProcessor objectPostProcessor) {
-        Bean beanAfterProcess = objectPostProcessor.postProcessAfterInitialization(bean, bean.getId());
-        beans.put(bean.getId(), beanAfterProcess);
+        Object objectAfterProcess = objectPostProcessor.postProcessAfterInitialization(bean, bean.getId());
+        bean.setValue(objectAfterProcess);
+        beans.put(bean.getId(), bean);
     }
 
     public void callPostProcessBeforeInitialization(Bean bean, BeanPostProcessor objectPostProcessor) {
-        Bean beanBeforeProcess = objectPostProcessor.postProcessBeforeInitialization(bean, bean.getId());
-        beans.put(bean.getId(), beanBeforeProcess);
+        Object objectBeforeProcess = objectPostProcessor.postProcessBeforeInitialization(bean, bean.getId());
+        bean.setValue(objectBeforeProcess);
+        beans.put(bean.getId(), bean);
     }
 
     @SneakyThrows
@@ -207,7 +214,7 @@ public class GenericApplicationContext implements ApplicationContext {
         if ((BeanPostProcessor.class).isAssignableFrom(clazz)) {
             BeanDefinition entryValue = entry.getValue();
             BeanPostProcessor newPostProcessor =
-                    (BeanPostProcessor) Class.forName(clazz.getName()).getDeclaredConstructor().newInstance();
+                    (BeanPostProcessor) Class.forName(clazz.getName()).getConstructor().newInstance();
             Bean newBean = new Bean(entryValue.getId(), newPostProcessor);
             serviceBeans.put(entry.getKey(), newBean);
         }
@@ -215,21 +222,26 @@ public class GenericApplicationContext implements ApplicationContext {
 
     @SneakyThrows
     private void clarifyMethodAndInjectValue(Bean bean, String keyValue, String value) {
-        Method[] declaredMethods = bean.getValue().getClass().getDeclaredMethods();
-        String methodName = "set" + keyValue.substring(0, 1).toUpperCase() + keyValue.substring(1);
-        Method methodClass = Arrays.stream(declaredMethods)
-                .filter(method -> method.getName().equals(methodName))
-                .findFirst().orElseThrow(Exception::new);
-        Class<?>[] parameterTypes = methodClass.getParameterTypes();
-        String methodClassName = parameterTypes[0].getName();
+        try {
+            Method[] methods = bean.getValue().getClass().getMethods();
 
-        if (methodClassName.equals("int")) {
-            Method neededMethod = bean.getValue().getClass().getDeclaredMethod(methodName, Integer.TYPE);
-            injectValue(bean.getValue(), neededMethod, value);
-            return;
+            String methodName = "set" + keyValue.substring(0, 1).toUpperCase() + keyValue.substring(1);
+            Method methodClass = Arrays.stream(methods)
+                    .filter(method -> method.getName().equals(methodName))
+                    .findFirst().orElseThrow(Exception::new);
+            Class<?>[] parameterTypes = methodClass.getParameterTypes();
+            String methodClassName = parameterTypes[0].getName();
+
+            if (methodClassName.equals("int")) {
+                Method neededMethod = bean.getValue().getClass().getMethod(methodName, Integer.TYPE);
+                injectValue(bean.getValue(), neededMethod, value);
+                return;
+            }
+            Method neededMethod = bean.getValue().getClass().getMethod(methodName, String.class);
+            injectValue(bean.getValue(), neededMethod, String.valueOf(value));
+        } catch (InvocationTargetException e) {
+            e.getCause().printStackTrace();
         }
-        Method neededMethod = bean.getValue().getClass().getDeclaredMethod(methodName, String.class);
-        injectValue(bean.getValue(), neededMethod, String.valueOf(value));
     }
 
     @SneakyThrows
@@ -243,9 +255,9 @@ public class GenericApplicationContext implements ApplicationContext {
 
     @SneakyThrows
     private void clarifyMethodAndInjectRefDependencies(Bean bean, String fieldName, Object value) {
-        Method[] declaredMethods = bean.getValue().getClass().getDeclaredMethods();
+        Method[] methods = bean.getValue().getClass().getMethods();
         String methodName = "set" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
-        Method methodClass = Arrays.stream(declaredMethods)
+        Method methodClass = Arrays.stream(methods)
                 .filter(method -> method.getName().equals(methodName))
                 .findFirst().orElseThrow(Exception::new);
         methodClass.invoke(bean.getValue(), value);
