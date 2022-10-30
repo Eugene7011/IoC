@@ -125,8 +125,10 @@ public class GenericApplicationContext implements ApplicationContext {
             Bean bean = beans.get(key);
             Map<String, String> refDependencies = entry.getValue().getRefDependencies();
 
+        if (refDependencies.size() != 0) {
             refDependencies.forEach((fieldName, beanObject)
                     -> clarifyMethodAndInjectRefDependencies(bean, fieldName, beans.get(beanObject).getValue()));
+        }
         }
     }
 
@@ -170,13 +172,15 @@ public class GenericApplicationContext implements ApplicationContext {
     }
 
     public void callPostProcessAfterInitialization(Bean bean, BeanPostProcessor objectPostProcessor) {
-        Bean beanAfterProcess = objectPostProcessor.postProcessAfterInitialization(bean, bean.getId());
-        beans.put(bean.getId(), beanAfterProcess);
+        Object objectAfterProcess = objectPostProcessor.postProcessAfterInitialization(bean, bean.getId());
+        bean.setValue(objectAfterProcess);
+        beans.put(bean.getId(), bean);
     }
 
     public void callPostProcessBeforeInitialization(Bean bean, BeanPostProcessor objectPostProcessor) {
-        Bean beanBeforeProcess = objectPostProcessor.postProcessBeforeInitialization(bean, bean.getId());
-        beans.put(bean.getId(), beanBeforeProcess);
+        Object objectBeforeProcess = objectPostProcessor.postProcessBeforeInitialization(bean, bean.getId());
+        bean.setValue(objectBeforeProcess);
+        beans.put(bean.getId(), bean);
     }
 
     @SneakyThrows

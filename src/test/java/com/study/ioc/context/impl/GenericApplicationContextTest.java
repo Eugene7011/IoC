@@ -12,6 +12,7 @@ import com.study.ioc.processor.BeanFactoryPostProcessor;
 import com.study.ioc.processor.BeanPostProcessor;
 import com.study.ioc.processor.CustomBeanFactoryPostProcessor;
 import com.study.ioc.processor.CustomBeanPostProcessor;
+import com.study.ioc.processor.TestClass;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -287,22 +288,34 @@ public class GenericApplicationContextTest {
         Map<String, BeanDefinition> beanDefinitionMap = new HashMap<>();
         BeanDefinition beanDefinitionUserService = new BeanDefinition("userService", "com.study.entity.DefaultUserService");
         beanDefinitionMap.put("userService", beanDefinitionUserService);
+
         BeanDefinition beanDefinitionMailService = new BeanDefinition("mailServicePOP", "com.study.entity.MailService");
         beanDefinitionMap.put("mailServicePOP", beanDefinitionMailService);
+
         BeanDefinition beanDefinitionPostProcessor =
                 new BeanDefinition("customBeanPostProcessor", "com.study.ioc.processor.CustomBeanPostProcessor");
         beanDefinitionMap.put("customBeanPostProcessor", beanDefinitionPostProcessor);
 
-        Map<String, Bean> beans = genericApplicationContext.createBeans(beanDefinitionMap);
+        BeanDefinition beanDefinitionTestClass = new BeanDefinition("testClass", "com.study.ioc.processor.TestClass");
+        beanDefinitionMap.put("testClass", beanDefinitionTestClass);
+
         genericApplicationContext.createAllServiceBeans(beanDefinitionMap);
+        genericApplicationContext.processBeanDefinitions(beanDefinitionMap);
+        Map<String, Bean> beans = genericApplicationContext.createBeans(beanDefinitionMap);
+        genericApplicationContext.injectValueDependencies(beanDefinitionMap, beans);
+        genericApplicationContext.injectRefDependencies(beanDefinitionMap, beans);
+
         Bean customBeanPostProcessor = genericApplicationContext.getServiceBeans().get("customBeanPostProcessor");
         BeanPostProcessor beanPostProcessor = (BeanPostProcessor) customBeanPostProcessor.getValue();
         Bean userServiceBean = beans.get("userService");
         assertEquals("userService", userServiceBean.getId());
 
+        Bean testClassBeanAfterProcess = beans.get("testClass");
         genericApplicationContext.callPostProcessBeforeInitialization(userServiceBean, beanPostProcessor);
-        Bean userServiceBeanAfterProcess = beans.get("userService");
-        assertEquals("BeforeInitialization", userServiceBeanAfterProcess.getId());
+        genericApplicationContext.callPostProcessBeforeInitialization(testClassBeanAfterProcess, beanPostProcessor);
+        TestClass testClass = (TestClass) testClassBeanAfterProcess.getValue();
+        assertEquals("BeforeInitialization", testClass.getText());
+        assertEquals(001, testClass.getId());
 
         Bean mailServiceBean = beans.get("mailServicePOP");
         MailService mailService = (MailService) mailServiceBean.getValue();
@@ -316,8 +329,12 @@ public class GenericApplicationContextTest {
         assertEquals("TEST", mailServiceAfterInitMethod.getProtocol());
 
         genericApplicationContext.callPostProcessAfterInitialization(userServiceBean, beanPostProcessor);
-        Bean userServiceBeanAfterProcessor = beans.get("userService");
-        assertEquals("AfterInitialization", userServiceBeanAfterProcessor.getId());
+        genericApplicationContext.callPostProcessAfterInitialization(testClassBeanAfterProcess, beanPostProcessor);
+        Bean testClassBeanAfterProcessor = beans.get("testClass");
+        TestClass testClassFinal = (TestClass) testClassBeanAfterProcessor.getValue();
+        assertEquals("AfterInitialization", testClassFinal.getText());
+        assertEquals(003, testClassFinal.getId());
     }
+
 
 }
